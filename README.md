@@ -1,13 +1,14 @@
-Perfect 👍
-Here is a **clean, professional README.md** you can **directly copy-paste** into your GitHub repository.
-It explains **how to run the FastAPI backend after cloning** — step by step.
+Great 👍
+Below is an **updated README.md** assuming your backend now uses **MongoDB (with Motor / PyMongo)** instead of SQLAlchemy + SQLite.
+
+You can **replace your existing README.md with this**.
 
 ---
 
-# 🧠 Research Project Backend (FastAPI)
+# 🧠 Research Project Backend (FastAPI + MongoDB)
 
 This repository contains the **FastAPI backend** for the research project.
-It provides REST APIs built with **FastAPI**, **SQLAlchemy**, and **SQLite** (can be changed to PostgreSQL).
+It provides REST APIs built with **FastAPI** and **MongoDB**, designed to support a Flutter mobile application.
 
 ---
 
@@ -16,8 +17,9 @@ It provides REST APIs built with **FastAPI**, **SQLAlchemy**, and **SQLite** (ca
 * **Python 3.10+**
 * **FastAPI**
 * **Uvicorn**
-* **SQLAlchemy**
-* **SQLite** (default database)
+* **MongoDB**
+* **Motor (Async MongoDB driver)**
+* **Pydantic**
 
 ---
 
@@ -26,13 +28,16 @@ It provides REST APIs built with **FastAPI**, **SQLAlchemy**, and **SQLite** (ca
 ```
 backend/
 ├── app/
-│   ├── main.py
+│   ├── main.py              # FastAPI entry point
 │   ├── database/
-│   ├── models/
-│   ├── routes/
-│   ├── services/
-│   └── schemas/
+│   │   └── mongo.py         # MongoDB connection
+│   ├── models/              # DB models (optional)
+│   ├── schemas/             # Pydantic schemas
+│   ├── routes/              # API routes
+│   ├── services/            # Business logic / AI calls
+│   └── core/                # Config / settings
 ├── requirements.txt
+├── .env.example
 ├── .gitignore
 └── README.md
 ```
@@ -41,13 +46,16 @@ backend/
 
 ## ⚙️ Prerequisites
 
-Make sure the following are installed on your system:
+Install the following:
 
-* **Python 3.10 or higher**
+* **Python 3.10+**
 * **Git**
-* **Pip**
+* **MongoDB**
 
-Check versions:
+  * Local MongoDB **or**
+  * MongoDB Atlas (cloud – free tier)
+
+Check:
 
 ```bash
 python --version
@@ -83,8 +91,6 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-You should see `(venv)` in the terminal.
-
 ---
 
 ### 3️⃣ Install Dependencies
@@ -95,7 +101,39 @@ pip install -r requirements.txt
 
 ---
 
-### 4️⃣ Run the FastAPI Server
+### 4️⃣ Configure Environment Variables
+
+Create a `.env` file in the `backend/` folder:
+
+```env
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB_NAME=research_db
+```
+
+👉 For MongoDB Atlas:
+
+```env
+MONGO_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/
+MONGO_DB_NAME=research_db
+```
+
+---
+
+### 5️⃣ Run MongoDB
+
+#### Local MongoDB
+
+Make sure MongoDB is running:
+
+```bash
+mongod
+```
+
+Or via **MongoDB Compass**
+
+---
+
+### 6️⃣ Run the FastAPI Server
 
 ```bash
 uvicorn app.main:app --reload
@@ -109,15 +147,17 @@ http://127.0.0.1:8000
 
 ---
 
-## 📚 API Documentation (Swagger UI)
+## 📚 API Documentation
 
-Open in browser:
+FastAPI provides auto-generated docs:
+
+* Swagger UI:
 
 ```
 http://127.0.0.1:8000/docs
 ```
 
-or Redoc:
+* Redoc:
 
 ```
 http://127.0.0.1:8000/redoc
@@ -133,22 +173,29 @@ You can test APIs using:
 * Postman
 * Curl
 
----
+Example POST request body:
 
-## 🗄 Database Configuration
-
-Default database:
-
-* **SQLite**
-* File: `test.db` (auto-created on first run)
-
-Database configuration file:
-
-```python
-app/database/db.py
+```json
+{
+  "child_id": 1,
+  "mood": "happy",
+  "note": "Feeling good today"
+}
 ```
 
-You can replace SQLite with PostgreSQL or MySQL if needed.
+---
+
+## 🗄 MongoDB Details
+
+* Database name: `research_db`
+* Collections are created **automatically**
+* No migrations required
+
+Mongo connection file:
+
+```
+app/database/mongo.py
+```
 
 ---
 
@@ -156,35 +203,55 @@ You can replace SQLite with PostgreSQL or MySQL if needed.
 
 ### ❌ `ModuleNotFoundError: No module named 'app'`
 
-✅ Make sure you run `uvicorn` **inside the `backend/` folder**
+✅ Run `uvicorn` **inside the backend folder**
 
 ---
 
-### ❌ `uvicorn is not recognized`
+### ❌ MongoDB connection error
 
-✅ Ensure:
+✅ Check:
+
+* MongoDB is running
+* `MONGO_URI` is correct
+* IP whitelist enabled (MongoDB Atlas)
+
+---
+
+### ❌ `uvicorn` not recognized
+
+✅ Run:
 
 ```bash
 pip install uvicorn
 ```
 
-and virtual environment is activated.
+and activate virtual environment.
 
 ---
 
-## 🌐 Deployment
+## 🌐 Free Deployment Options (MongoDB Compatible)
 
-This project can be deployed for **free** using:
+You can deploy this backend for free using:
 
-* **Render**
-* **Railway**
-* **Deta**
+| Platform       | Notes                |
+| -------------- | -------------------- |
+| **Render**     | Best option          |
+| **Railway**    | Easy MongoDB support |
+| **Deta Space** | Lightweight APIs     |
 
 Deployment command:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
+
+---
+
+## 🔐 Security Notes
+
+* Do **NOT** commit `.env` file
+* Use environment variables in production
+* Enable MongoDB Atlas IP restrictions
 
 ---
 
@@ -196,15 +263,15 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 ## 📄 License
 
-This project is for **research and educational purposes**.
+This project is for **research and educational purposes only**.
 
 ---
 
 If you want, I can also:
 
-* Add **Docker support**
-* Prepare **Render deployment files**
-* Improve API documentation
-* Connect Flutter frontend 🚀
+* Add **Docker + MongoDB**
+* Prepare **Render / Railway deployment configs**
+* Optimize MongoDB schema
+* Connect **Flutter app APIs**
 
-Just tell me 👍
+Just say the word 🚀
