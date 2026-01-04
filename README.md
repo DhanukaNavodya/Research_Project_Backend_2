@@ -1,8 +1,3 @@
-Great 👍
-Below is an **updated README.md** assuming your backend now uses **MongoDB (with Motor / PyMongo)** instead of SQLAlchemy + SQLite.
-
-You can **replace your existing README.md with this**.
-
 ---
 
 # 🧠 Research Project Backend (FastAPI + MongoDB)
@@ -275,3 +270,4 @@ If you want, I can also:
 * Connect **Flutter app APIs**
 
 Just say the word 🚀
+
