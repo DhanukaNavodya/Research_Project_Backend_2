@@ -1,6 +1,7 @@
 from fastapi import APIRouter
-from app.schemas.mood_schema import MoodCheckin, MoodData
+from app.schemas.mood_schema import MoodCheckin, MoodData, MoodPredictRequest
 from app.services.mood_service import save_mood
+from app.ml.predictor import predict_with_probs
 
 router = APIRouter(prefix="/mood", tags=["Mood"])
 
@@ -18,3 +19,7 @@ def mood_checkin(data: MoodCheckin):
 def store_mood(data: MoodData):
     result = save_mood(data.userId, data.mood, data.datetime)
     return {"status": "success", "data": result}
+
+@router.post("/predict")
+def mood_predict(data: MoodPredictRequest):
+    return predict_with_probs(data.text)

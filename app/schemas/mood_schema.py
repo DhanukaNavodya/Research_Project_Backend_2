@@ -16,3 +16,6 @@ class MoodData(BaseModel):
 
     class Config:
         from_attributes = True
+
+class MoodPredictRequest(BaseModel):
+    text: str
