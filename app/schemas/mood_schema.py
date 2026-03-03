@@ -19,3 +19,14 @@ class MoodData(BaseModel):
 
 class MoodPredictRequest(BaseModel):
     text: str
+
+class MoodQuestionPredictRequest(BaseModel):
+    question_id: int
+    text: str
+
+class ValidateAnswerRequest(BaseModel):
+    question_id: int
+    text: str
+
+class MoodOverallRequest(BaseModel):
+    answers: list[str]
