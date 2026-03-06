@@ -1,8 +1,10 @@
-from fastapi import APIRouter
-from app.schemas.mood_schema import MoodCheckin, MoodData, MoodPredictRequest, MoodQuestionPredictRequest, ValidateAnswerRequest, MoodOverallRequest
+from fastapi import APIRouter, Depends
+from app.schemas.mood_schema import MoodCheckin, MoodData, MoodStoreRequest, MoodPredictRequest, MoodQuestionPredictRequest, ValidateAnswerRequest, MoodOverallRequest
 from app.services.mood_service import save_mood
 from app.services.answer_validator import validate_answer, normalize_text
 from app.ml.predictor import predict_with_probs
+from app.services.auth_service import get_current_child
+from app.schemas.auth_schema import TokenData
 
 router = APIRouter(prefix="/mood", tags=["Mood"])
 
@@ -17,9 +19,69 @@ def mood_checkin(data: MoodCheckin):
     }}
 
 @router.post("/store")
-def store_mood(data: MoodData):
-    result = save_mood(data.userId, data.mood, data.datetime)
-    return {"status": "success", "data": result}
+def store_mood(data: MoodStoreRequest, current_child: TokenData = Depends(get_current_child)):
+    """
+    Store mood data (protected endpoint - child JWT required)
+    
+    After storing, checks if alert should be sent based on:
+    - 7-day bad mood count >= threshold
+    - Child has enabled alerts_consent
+    """
+    from datetime import datetime, timedelta
+    from app.database.db import moods_col, children_col
+    from app.services.child_service import get_child_by_id
+    from app.services.trusted_service import get_parent_and_trusted_emails
+    from app.services.email_service import send_mood_alert
+    from app.core.config import BAD_MOOD_THRESHOLD
+    from bson import ObjectId
+    
+    # Store mood with child_id from JWT token
+    mood_doc = {
+        "child_id": ObjectId(current_child.id),
+        "mood": data.mood,
+        "datetime": data.datetime
+    }
+    
+    result = moods_col.insert_one(mood_doc)
+    mood_doc["_id"] = result.inserted_id
+    
+    # Check if alert should be sent
+    try:
+        child = get_child_by_id(current_child.id)
+        
+        if child and child.get("alerts_consent", False):
+            # Count bad moods in last 7 days
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            
+            bad_mood_count = moods_col.count_documents({
+                "child_id": ObjectId(current_child.id),
+                "mood": {"$in": ["Bad", "bad", "BAD"]},
+                "datetime": {"$gte": seven_days_ago}
+            })
+            
+            # Send alert if threshold reached
+            if bad_mood_count >= BAD_MOOD_THRESHOLD:
+                recipients = get_parent_and_trusted_emails(current_child.id)
+                
+                if recipients:
+                    send_mood_alert(
+                        recipients=recipients,
+                        child_name=child.get("name", "the child"),
+                        bad_mood_count=bad_mood_count
+                    )
+    except Exception as e:
+        # Log error but don't fail the mood storage
+        print(f"Alert check failed: {str(e)}")
+    
+    return {
+        "status": "success",
+        "data": {
+            "_id": str(mood_doc["_id"]),
+            "child_id": str(mood_doc["child_id"]),
+            "mood": mood_doc["mood"],
+            "datetime": mood_doc["datetime"]
+        }
+    }
 
 @router.post("/predict")
 def mood_predict(data: MoodPredictRequest):

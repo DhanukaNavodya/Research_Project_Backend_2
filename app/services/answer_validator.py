@@ -30,7 +30,14 @@ NEUTRAL_PHRASES = {
     "අවුලක් නෑ",
     "මොකුත් නෑ",
     "එහෙම දෙයක් නෑ"
+    "එම විශේෂ දෙයක් නෑ"
+    " එහෙම අවුලක් තිබ්බේ නෑ"
+    " එම අවුලක් තිබ්බේ නෑ"
 }
+
+# Q1 Neutral Phrases - reuse NEUTRAL_PHRASES for Q1 "no issue" answers
+# Returns as Q1_DIRECT_MOOD with Normal mood
+Q1_NEUTRAL_PHRASES = NEUTRAL_PHRASES
 
 # Q1 Direct Mood Words - for recognizing short mood-indicating answers
 Q1_HAPPY_WORDS = {
@@ -47,6 +54,25 @@ Q1_BAD_WORDS = {
     "නරකයි", "දුකයි", "හොඳ නෑ", "ආතතියි", "මහන්සියි",
     "stress", "bad", "වෙහෙසයි", "නරක", "දුක",
     "හොඳ නැහැ", "මහන්සි"
+}
+
+# Q1 Feeling/Mood signals - for detecting mood-related answers
+Q1_FEELING_SIGNALS = {
+    "හොඳ", "හොඳයි", "සතුටු", "සතුටුයි", "දුක", "දුකයි",
+    "නරක", "නරකයි", "සාමාන්‍ය", "සාමාන්‍යයි", "විශේෂ"
+    "මහන්සි", "මහන්සියි", "වෙහෙස", "වෙහෙසයි", "ආතතිය", "ආතතියි", "stress",
+    "බය", "බයයි", "කේන්ති", "තරහ", "තරහයි", "කම්මැලි",
+    "අමාරු", "හරිම අමාරු", "අසරණ", "ලැජ්ජා", "කනගාටු",
+    "සැනසුම", "සතුටක්", "දුකක්", "විනෝද", "විනෝදයි", "රසවත්",
+    "happy", "sad", "tired", "angry", "scared", "worried"
+}
+
+# Q1 Day/Context signals - for detecting day-related context
+Q1_DAY_SIGNALS = {
+    "අද", "ඊයේ", "අනිද්දා", "දවස", "දවස්", "මේ දවස",
+    "ඉස්කෝලේ", "පාසල", "පාසලේ", "class", "school",
+    "යාළුව", "යාළුවෝ", "යාළුවා", "ගුරුවර", "ගුරුතුමා",
+    "පාඩම්", "පාඩම", "homework", "exam", "test", "විභාග", "පරීක්ෂණ"
 }
 
 # Keywords per question to determine relevance
@@ -117,6 +143,30 @@ def is_yes_no_answer(normalized_text: str) -> bool:
     return False
 
 
+def starts_with_yes_no(normalized_text: str) -> tuple[bool, str]:
+    """
+    Check if the answer starts with a YES or NO token.
+    Used for Q2-Q5 to prioritize YES/NO detection even if more words follow.
+    
+    Args:
+        normalized_text: Normalized text
+        
+    Returns:
+        Tuple of (is_yes_no, first_token)
+        - is_yes_no: True if first token is yes/no, False otherwise
+        - first_token: The first token if yes/no, empty string otherwise
+    """
+    tokens = normalized_text.split()
+    if not tokens:
+        return (False, "")
+    
+    first = tokens[0]
+    if first in YES_WORDS or first in NO_WORDS:
+        return (True, first)
+    
+    return (False, "")
+
+
 def contains_keyword(normalized_text: str, question_id: int) -> bool:
     """
     Check if the text contains any relevant keyword for the given question.
@@ -135,6 +185,41 @@ def contains_keyword(normalized_text: str, question_id: int) -> bool:
     for keyword in keywords:
         # Check if keyword appears in the text (whole word or substring)
         if keyword.lower() in normalized_text:
+            return True
+    
+    return False
+
+
+def contains_q1_signal(normalized_text: str) -> bool:
+    """
+    Check if Q1 answer contains signals indicating it's about mood/day/feelings.
+    
+    Args:
+        normalized_text: Normalized text
+        
+    Returns:
+        True if answer appears to be about student's day or mood, False otherwise
+    """
+    # Check for feeling/mood words
+    has_feeling = any(signal in normalized_text for signal in Q1_FEELING_SIGNALS)
+    if has_feeling:
+        return True
+    
+    # Check for day-context words
+    has_day_context = any(signal in normalized_text for signal in Q1_DAY_SIGNALS)
+    if has_day_context:
+        return True
+    
+    # Pattern: contains "මට" or "මම" with feeling/mood words
+    if ("මට" in normalized_text or "මම" in normalized_text):
+        if any(signal in normalized_text for signal in Q1_FEELING_SIGNALS):
+            return True
+    
+    # Pattern: contains "අද" with feeling/mood or day-context words
+    if "අද" in normalized_text:
+        if any(signal in normalized_text for signal in Q1_FEELING_SIGNALS):
+            return True
+        if any(signal in normalized_text for signal in Q1_DAY_SIGNALS):
             return True
     
     return False
@@ -169,6 +254,16 @@ def validate_answer(question_id: int, text: str) -> dict:
     # Q1 Direct Mood Detection - Check BEFORE yes/no rejection for Q1
     # This allows words like "හරි" to be recognized as mood indicators
     if question_id == 1:
+        # Check for neutral phrases first ("no issue" answers)
+        for phrase in Q1_NEUTRAL_PHRASES:
+            if phrase in normalized:
+                return {
+                    "status": "Q1_DIRECT_MOOD",
+                    "normalized": normalized,
+                    "is_yes_no": False,
+                    "direct_mood": "Normal"
+                }
+        
         tokens = normalized.split()
         if len(tokens) <= 3:
             # Check if it's a direct mood word
@@ -193,6 +288,17 @@ def validate_answer(question_id: int, text: str) -> dict:
                     "is_yes_no": False,
                     "direct_mood": "Bad"
                 }
+    
+    # For Q2-Q5, prioritize YES/NO detection if answer starts with YES/NO token
+    # This prevents longer answers like "ඔව් අද ගොඩක් වැඩ තිබුණා" from being sent to ML
+    if question_id in [2, 3, 4, 5]:
+        yn, first_token = starts_with_yes_no(normalized)
+        if yn:
+            return {
+                "status": "YES_NO",
+                "normalized": first_token,
+                "is_yes_no": True
+            }
     
     # Check if it's a yes/no answer
     is_yes_no = is_yes_no_answer(normalized)
@@ -243,6 +349,15 @@ def validate_answer(question_id: int, text: str) -> dict:
             "is_yes_no": False
         }
     
+    # For Q1, check if answer is actually about mood/day (has Q1 signals)
+    if question_id == 1:
+        if not contains_q1_signal(normalized):
+            return {
+                "status": "IRRELEVANT",
+                "normalized": normalized,
+                "is_yes_no": False
+            }
+    
     # For Q2-Q5, check keyword relevance
     if question_id in [2, 3, 4, 5]:
         if not contains_keyword(normalized, question_id):
@@ -252,7 +367,6 @@ def validate_answer(question_id: int, text: str) -> dict:
                 "is_yes_no": False
             }
     
-    # For Q1, don't check keyword relevance (accept any descriptive answer)
     # If we reach here, the answer is valid
     return {
         "status": "VALID_TEXT",
@@ -273,12 +387,25 @@ def validate_answer(question_id: int, text: str) -> dict:
 # validate_answer(1, "සාමාන්‍යයි") -> {"status": "Q1_DIRECT_MOOD", "direct_mood": "Normal"}
 # validate_answer(1, "හරි") -> {"status": "Q1_DIRECT_MOOD", "direct_mood": "Normal"}
 #
+# Q1 Neutral Phrases ("no issue" answers):
+# validate_answer(1, "මොකුත් නෑ") -> {"status": "Q1_DIRECT_MOOD", "direct_mood": "Normal"}
+# validate_answer(1, "එහෙම විශේෂ දෙයක් නෑ") -> {"status": "Q1_DIRECT_MOOD", "direct_mood": "Normal"}
+# validate_answer(1, "ගැටලුවක් නෑ") -> {"status": "Q1_DIRECT_MOOD", "direct_mood": "Normal"}
+#
 # Q1 Longer Answers:
 # validate_answer(1, "අද දවස හොඳයි මට සතුටුයි") -> {"status": "VALID_TEXT"}
+# validate_answer(1, "අද ටිකක් මහන්සියි") -> {"status": "VALID_TEXT"}
+# validate_answer(1, "අද ඉස්කෝලේ දවස හොඳයි") -> {"status": "VALID_TEXT"}
+# validate_answer(1, "අද මට ටිකක් ආතතියක් තිබුණා") -> {"status": "VALID_TEXT"}
 #
 # Q1 Invalid:
 # validate_answer(1, "ඔව්") -> {"status": "NEED_MORE_INFO"} (yes/no not allowed)
 # validate_answer(1, "xyz") -> {"status": "NEED_MORE_INFO"} (too short, no mood word)
+#
+# Q1 Irrelevant (no mood/day signals):
+# validate_answer(1, "මම පාන් කෑවා") -> {"status": "IRRELEVANT"}
+# validate_answer(1, "අද මම වාහනයෙන් ගියා") -> {"status": "IRRELEVANT"}
+# validate_answer(1, "මම පොතක් ගත්තා") -> {"status": "IRRELEVANT"}
 #
 # Q2-Q5 YES/NO (unchanged behavior):
 # validate_answer(2, "ඔව්") -> {"status": "YES_NO"}
