@@ -249,6 +249,12 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 * Enable MongoDB Atlas IP restrictions
 
 ---
+## Deployment (AWS EC2 + S3)
+
+See `docs/DEPLOYMENT_EC2_S3.md` for a full pipeline setup, EC2 provisioning steps, and S3-based model delivery.
+
+---
+
 
 ## 👨‍💻 Author
 
