@@ -5,27 +5,28 @@ on:
     branches:
       - main
 
-concurrency:
-  group: deploy-ec2
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy over SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          EC2_APP_DIR: "/srv/research-backend"
+          S3_BUCKET: "${{ secrets.S3_BUCKET }}"
+          S3_PREFIX: "${{ secrets.S3_PREFIX }}"
+          APP_SERVICE: "research-backend"
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: ${{ secrets.EC2_PORT || 22 }}
+          port: ${{ secrets.EC2_PORT }}
           envs: EC2_APP_DIR,S3_BUCKET,S3_PREFIX,APP_SERVICE
           script: |
             set -e
-            cd "${EC2_APP_DIR:-/srv/research-backend}"
-            export EC2_APP_DIR
-            export S3_BUCKET
-            export S3_PREFIX
-            export APP_SERVICE
+            cd "${EC2_APP_DIR}"
             bash scripts/ec2_deploy.sh
