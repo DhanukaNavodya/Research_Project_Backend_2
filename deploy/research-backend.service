@@ -1,0 +1,16 @@
+[Unit]
+Description=Research Project Backend
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/research-backend
+EnvironmentFile=/srv/research-backend/.env
+ExecStart=/srv/research-backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
