@@ -2,7 +2,6 @@ fastapi
 uvicorn
 sqlalchemy
 pydantic
-torch
 transformers
 librosa
 pymongo[srv]
